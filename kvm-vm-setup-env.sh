@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# HOST_SERVER is my host machine.
 HOST_SERVER=10.0.0.200
 IMAGES_DIR=/var/lib/libvirt/images
 OFFICIAL_IMAGE=rhel-server-7.7-beta-1-x86_64-kvm.qcow2
@@ -21,7 +22,7 @@ fi
 
 [ "${ANSWER}" != "YES" ] && exit 1
 
-### Clean the environment
+### Clean the Network environment
 
 if virsh net-list --all | egrep -q "provisioning|trunk"
 then
@@ -32,8 +33,7 @@ then
   done
 fi
 
-vbmc list | awk '/undercloud/ { print $2; }' | xargs vbmc delete
-vbmc list | awk '/overcloud/ { print $2; }' | xargs vbmc delete
+### clean the firewall configuraiton
 
 if firewall-cmd --get-active-zones | grep -q virt
 then
@@ -42,6 +42,8 @@ then
 fi
 
 cd ${IMAGES_DIR}
+
+# delete all the VMs for any previous OSP Director deployment
 
 if virsh list --all | egrep -q  'compute|networker|ctrl|ceph|undercloud'
 then
@@ -77,7 +79,7 @@ cat > /tmp/trunk.xml <<EOF
       <port start='1024' end='65535'/>
     </nat>
   </forward>
-  <ip address="192.168.0.1" netmask="255.255.255.0"/>
+  <ip address="192.168.0.254" netmask="255.255.255.0"/>
 </network>
 EOF
 
@@ -97,9 +99,6 @@ firewall-cmd --reload
 
 # Create virtual machines
 
-# Download course specific config files for VM customization
-#curl -o /tmp/open.repo http://classroom/open.repo
-
 # Define config files for network interfaces on the undercloud node
 cat > /tmp/ifcfg-eth0 << EOF
 DEVICE="eth0"
@@ -107,16 +106,20 @@ BOOTPROTO="dhcp"
 ONBOOT="yes"
 TYPE="Ethernet"
 NM_CONTROLLED="yes"
+IPADDR=172.16.0.4
+NETMASK=255.255.255.0
+GATEWAY=172.16.0.254
+DNS1=8.8.8.8
 EOF
 
 cat > /tmp/ifcfg-eth1 << EOF
 DEVICE="eth1"
 BOOTPROTO="none"
-ONBOOT="yes"
+ONBOOT="no"
 TYPE="Ethernet"
 IPADDR=192.168.0.253
 NETMASK=255.255.255.0
-GATEWAY=192.168.0.1
+GATEWAY=192.168.0.254
 NM_CONTROLLED="no"
 DNS1=8.8.8.8
 EOF
@@ -126,8 +129,13 @@ cat > /tmp/hosts <<EOF
 127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
 ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
 
-${HOST_SERVER}  demo
+${HOST_SERVER}  hubble
 EOF
+
+# customize vm inage
+# disk: 30GB
+# password:
+# hostname: 
 
 qemu-img create -f qcow2 test1.qcow2 30G
 virt-resize --expand /dev/sda1 ${OFFICIAL_IMAGE} test1.qcow2
@@ -154,5 +162,3 @@ rm /tmp/open.repo
 
 virsh define --file /tmp/test1.xml
 rm /tmp/test1.xml
-
-
