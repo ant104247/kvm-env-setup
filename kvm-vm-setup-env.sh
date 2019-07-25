@@ -11,7 +11,7 @@ VIRT_DOMAIN='example.com'
 
 ANSWER=YES
 
-if virsh list --all | egrep -q  'comp|net|ctrl|ceph|undercloud'
+if virsh list --all | egrep -q  'test'
 then
   unset ANSWER
   echo '*** WARNING ***'
@@ -45,9 +45,9 @@ cd ${IMAGES_DIR}
 
 # delete all the VMs for any previous OSP Director deployment
 
-if virsh list --all | egrep -q  'compute|networker|ctrl|ceph|undercloud'
+if virsh list --all | egrep -q  'test'
 then
-  for VM in overcloud-ctrl0{1,2,3} overcloud-compute0{1,2} overcloud-networker overcloud-ceph0{1,2,3} undercloud
+  for VM in test1
   do
     virsh destroy ${VM}  > /dev/null 2>&1
     virsh undefine ${VM} > /dev/null 2>&1
